@@ -1,20 +1,10 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pandas as pd
 from Bio import SeqIO
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
+from mee.common import ANNOT, FASTA, OUT
 from mee.translate import Translation, classify
-
-V4: Path = ROOT / "data" / "raw" / "megares_db_maintenance" / "database_files" / "v4"
-FASTA: Path = V4 / "megares_database_v4.00.fasta"
-ANNOT: Path = V4 / "megares_annotations_with_clusters_v4.00.csv"
-OUT: Path = ROOT / "data" / "processed"
 
 
 def parse_fasta() -> pd.DataFrame:
