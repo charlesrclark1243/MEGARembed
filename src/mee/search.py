@@ -6,7 +6,7 @@ import faiss
 import numpy as np
 import pandas as pd
 
-from mee.common import ARTIFACTS, OUT
+from mee.common import OUT, index_map_path, index_path
 from mee.translate import classify
 
 NUCLEOTIDE_ALPHABET: frozenset[str] = frozenset("ACGTUN")
@@ -20,48 +20,6 @@ DISPLAY_COLUMNS: list[str] = [
     "group",
     "requires_snp",
 ]
-
-
-def index_path(model_size: str) -> Path:
-    """
-    Path to the FAISS index for a model size.
-
-    Args:
-        model_size (str): The ESM-2 model size, e.g. '650M'.
-
-    Returns:
-        Path: Path to the FAISS index file.
-    """
-
-    return ARTIFACTS / f"megares_{model_size}.faiss"
-
-
-def index_map_path(model_size: str) -> Path:
-    """
-    Path to the row_idx -> meg_id map for a model size.
-
-    Args:
-        model_size (str): The ESM-2 model size, e.g. '650M'.
-
-    Returns:
-        Path: Path to the index map parquet file.
-    """
-
-    return ARTIFACTS / f"index_map_{model_size}.parquet"
-
-
-def embeddings_path(model_size: str) -> Path:
-    """
-    Path to the embeddings array for a model size.
-
-    Args:
-        model_size (str): The ESM-2 model size, e.g. '650M'.
-
-    Returns:
-        Path: Path to the embeddings .npy file.
-    """
-
-    return ARTIFACTS / f"embeddings_{model_size}.npy"
 
 
 def looks_like_nucleotide(sequence: str) -> bool:
