@@ -683,6 +683,7 @@ source = { editable = "." }
 dependencies = [
     { name = "biopython" },
     { name = "faiss-cpu" },
+    { name = "joblib" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "pyarrow" },
@@ -699,6 +700,7 @@ dependencies = [
 requires-dist = [
     { name = "biopython", specifier = ">=1.88" },
     { name = "faiss-cpu", specifier = ">=1.15.1" },
+    { name = "joblib", specifier = ">=1.6.0" },
     { name = "pandas", specifier = ">=3.0.6" },
     { name = "plotly", specifier = ">=7.1.0" },
     { name = "pyarrow", specifier = ">=25.0.1" },
