@@ -12,8 +12,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from mee.translate import Translation, classify
 
 V4: Path = ROOT / "data" / "raw" / "megares_db_maintenance" / "database_files" / "v4"
-FASTA: Path = V4 / "megares_v4.00.fasta"
-ANNOT: Path = V4 / "megares_v4.00_annotations_with_clusters_v4.00.csv"
+FASTA: Path = V4 / "megares_database_v4.00.fasta"
+ANNOT: Path = V4 / "megares_annotations_with_clusters_v4.00.csv"
 OUT: Path = ROOT / "data" / "processed"
 
 
@@ -61,9 +61,7 @@ def main() -> None:
     assert len(df) == 11506, f"Expected 11506 records, but got {len(df)}."
 
     annotations: pd.DataFrame = pd.read_csv(ANNOT)
-    annotations = annotations.rename(
-        columns={"Can be confirmed": "can_be_confirmed"}, inplace=True
-    )
+    annotations = annotations.rename(columns={"Can be confirmed": "can_be_confirmed"})
     annotations = annotations.drop(
         columns=["type", "class", "mechanism", "group"]
     )  # already in header
