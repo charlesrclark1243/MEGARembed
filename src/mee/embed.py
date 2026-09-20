@@ -6,7 +6,6 @@ MODELS: dict[str, str] = {
     "150M": "facebook/esm2_t30_150M_UR50D",
     "650M": "facebook/esm2_t33_650M_UR50D",
     "3B": "facebook/esm2_t36_3B_UR50D",
-    "15B": "facebook/esm2_t48_15B_UR50D",
 }
 
 
@@ -29,7 +28,7 @@ def load_model(model_id: str, device: str = "cuda") -> tuple[AutoTokenizer, Auto
 
     tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(MODELS[model_id])
     model: AutoModel = (
-        AutoModel.from_pretrained(MODELS[model_id], torch_dtype=torch.float16)
+        AutoModel.from_pretrained(MODELS[model_id], dtype=torch.float16)
         .to(device)
         .eval()
     )
@@ -67,10 +66,8 @@ def embed_batch(
     mask: torch.Tensor = encodings["attention_mask"].clone().float()
     mask[:, 0] = 0.0  # zero out special tokens
 
-    lengths: torch.Tensor = (
-        encodings["attention_mask"].sum(dim=1).float() - 1.0
-    )  # index of EOS
-    mask[torch.arange(mask.size(0), lengths)] = 0.0
+    lengths: torch.Tensor = encodings["attention_mask"].sum(dim=1) - 1  # index of EOS
+    mask[torch.arange(mask.size(0), device=mask.device), lengths] = 0.0
     mask = mask.unsqueeze(-1)
 
     summed: torch.Tensor = (outputs * mask).sum(dim=1)
