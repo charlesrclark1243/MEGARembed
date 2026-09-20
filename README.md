@@ -57,9 +57,10 @@ uv sync
 # 2. verify the GPU (checks compute capability and runs a real matmul)
 uv run scripts/gpu_check.py
 
-# 3. get the data
-git clone https://github.com/Microbial-Ecology-Group/MEGARes_db_maintenance.git \
-    data/raw/megares_db_maintenance
+# 3. get the data: download the MEGARes v4.0.0 archive and extract it so that
+#    data/raw/megares_db_maintenance/database_files/v4/ exists.
+#    Use the pinned release, not a git clone of main — the checksums in
+#    data/checksums.txt refer to the v4.0.0 files.
 
 # 4. build the artifacts (~10 minutes total on an RTX 5080)
 uv run scripts/01_parse_translate.py
@@ -129,9 +130,20 @@ the app share one implementation and cannot drift apart.
 
 ## Data and licensing
 
-MEGARes 4.0 is distributed by the [Microbial Ecology Group](https://github.com/Microbial-Ecology-Group/MEGARes_db_maintenance)
-under GPL-3.0 (Zenodo DOI [10.5281/zenodo.22778218](https://doi.org/10.5281/zenodo.22778218)).
+MEGARes 4.0 is published by the
+[Microbial Ecology Group](https://github.com/Microbial-Ecology-Group/MEGARes_db_maintenance).
 SHA-256 checksums of the exact source files used are recorded in `data/checksums.txt`.
+
+**Licensing is unsettled, so read this before redistributing anything derived from it.** The source
+distribution ships a GPL-3.0 `LICENSE` file, but its own README lists the license as
+"[LICENSE TO BE ADDED]" and states that "an aggregated resource cannot be licensed more permissively
+than its most restrictive source allows." MEGARes v4 aggregates CARD v4.0.0, ResFinder 4.7.1,
+PointFinder 4.7.1, NCBI AMRFinderPlus 4.0 and BacMet 2.0, each with its own terms.
+
+This repository redistributes none of it: `data/` and `artifacts/` are gitignored and built locally
+from your own copy of the database. Only `data/checksums.txt` is tracked. Anyone publishing the
+derived artifacts — embeddings, translated sequences, a prebuilt container — should check each
+source database's terms first.
 
 The database contains 11,506 accessions across 4 types, 63 classes, 275 mechanisms and 1,609 gene
 groups; 10,814 translate cleanly to protein and are indexed here, of which 552 carry the
