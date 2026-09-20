@@ -55,7 +55,7 @@ def verify(cuda_available: bool) -> bool:
             tensor = tensor.to("cpu")
 
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"CUDA processing failed: {e}")
             return False
 
