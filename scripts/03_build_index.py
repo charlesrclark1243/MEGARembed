@@ -5,8 +5,8 @@ import argparse
 import faiss
 import numpy as np
 
+from mee.common import index_path, load_embeddings
 from mee.embed import MODELS
-from mee.search import embeddings_path, index_map_path, index_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,42 +31,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def load_embeddings(model_size: str) -> np.ndarray:
-    """
-    Load protein embeddings and check they match the index map written by 02_embed.py.
-
-    Args:
-        model_size (str): The ESM-2 model size, e.g. '650M'.
-
-    Returns:
-        np.ndarray: A 2D float32 array of protein embeddings.
-
-    Raises:
-        FileNotFoundError: If the embeddings have not been generated.
-        ValueError: If the embeddings and index map disagree on row count.
-    """
-
-    import pandas as pd
-
-    path = embeddings_path(model_size)
-    if not path.exists():
-        raise FileNotFoundError(
-            f"No embeddings at {path}. Generate them with: "
-            f"uv run scripts/02_embed.py -s {model_size}"
-        )
-
-    embeddings: np.ndarray = np.load(path).astype(np.float32)
-    rows: int = len(pd.read_parquet(index_map_path(model_size)))
-
-    if len(embeddings) != rows:
-        raise ValueError(
-            f"{path.name} has {len(embeddings)} rows but its index map has {rows}; "
-            "rerun 02_embed.py so they are written together."
-        )
-
-    return embeddings
 
 
 def generate_index(embeddings: np.ndarray) -> faiss.Index:
