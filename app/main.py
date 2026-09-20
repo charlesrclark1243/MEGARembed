@@ -12,6 +12,8 @@ import plotly.express as px
 import streamlit as st
 import umap
 
+from mee.alignment import align_sequences, compute_score, setup_aligner
+from mee.common import OUT, index_map_path, load_embeddings
 from mee.embed import MODELS, embed_batch, load_model
 from mee.project import ONTOLOGY_LEVELS, load_reducer, project_query, scatter_frame
 from mee.search import annotate_hits, load_index, prepare_query, search
@@ -57,6 +59,39 @@ def get_scatter_frame(model_size: str) -> pd.DataFrame:
     """Load the coordinates + ontology table once per model size."""
 
     return scatter_frame(model_size)
+
+
+@st.cache_data(show_spinner="Loading proteins…")
+def get_proteins():
+    """Load the MEGARes proteins from the parquet file once per session."""
+
+    return pd.read_parquet(OUT / "megares_proteins.parquet")
+
+
+@st.cache_data(show_spinner="Aligning…")
+def get_alignment(query: str, target: str):
+    """Align the query sequence against the target sequence."""
+
+    aligner = setup_aligner()
+
+    aln = align_sequences(aligner, query, target)
+    score, identity = compute_score(aligner, aln)
+
+    return aln, score, identity
+
+
+@st.cache_data(show_spinner="Loading embeddings…")
+def get_embeddings(model_size: str) -> np.ndarray:
+    """Load the raw embedding matrix once, for neighbor-of-a-neighbor lookups."""
+
+    return load_embeddings(model_size)
+
+
+@st.cache_data(show_spinner="Loading index map…")
+def get_index_map(model_size: str) -> pd.DataFrame:
+    """Load the row_idx -> meg_id map once."""
+
+    return pd.read_parquet(index_map_path(model_size))
 
 
 def collapse_rare(labels: pd.Series, limit: int = MAX_LEGEND_CATEGORIES) -> pd.Series:
@@ -111,6 +146,7 @@ if st.button("Search", type="primary") and sequence.strip():
 
         st.session_state["result"] = {
             "note": note,
+            "protein": protein,
             "model_size": model_size,
             "hits": annotate_hits(scores, indices, model_size),
             # search() works on its own copy, so this embedding is still raw —
@@ -120,7 +156,9 @@ if st.button("Search", type="primary") and sequence.strip():
 
 result: dict | None = st.session_state.get("result")
 if result is not None and result["model_size"] != model_size:
-    st.warning(f"Results below are from {result['model_size']}. Search again to use {model_size}.")
+    st.warning(
+        f"Results below are from {result['model_size']}. Search again to use {model_size}."
+    )
 
 # ---------------------------------------------------------------------------
 # Results table
@@ -158,11 +196,17 @@ figure = px.scatter(
     y="y",
     color="legend",
     render_mode="webgl",  # 10k+ SVG points would crawl
-    hover_data={"meg_id": True, "x": False, "y": False, "legend": False, color_by: True},
+    hover_data={
+        "meg_id": True,
+        "x": False,
+        "y": False,
+        "legend": False,
+        color_by: True,
+    },
     labels={"legend": color_by},
     height=650,
 )
-figure.update_traces(marker=dict(size=4, opacity=0.65))
+figure.update_traces(marker={"size": 4, "opacity": 0.65})
 
 if result is not None and result["model_size"] == model_size:
     point: np.ndarray = result["point"]
@@ -170,12 +214,19 @@ if result is not None and result["model_size"] == model_size:
         x=[point[0]],
         y=[point[1]],
         mode="markers",
-        marker=dict(size=18, symbol="diamond", color="black", line=dict(width=2, color="white")),
+        marker={
+            "size": 18,
+            "symbol": "diamond",
+            "color": "black",
+            "line": {"width": 2, "color": "white"},
+        },
         name="your query",
         hovertext="your query",
     )
 
-figure.update_layout(legend=dict(itemsizing="constant"), margin=dict(l=0, r=0, t=10, b=0))
+figure.update_layout(
+    legend={"itemsizing": "constant"}, margin={"l": 0, "r": 0, "t": 10, "b": 0}
+)
 
 # on_select="rerun" makes Streamlit rerun the script when the user clicks or
 # lassos points, handing the selection back as the return value.
@@ -191,3 +242,57 @@ if selected:
         width="stretch",
         hide_index=True,
     )
+
+    # ---- click-to-inspect -------------------------------------------------
+    # Any indexed protein can be used as a query without touching the model:
+    # its embedding is already a row in the matrix we built offline.
+    inspect_id: str = st.selectbox(
+        "Inspect neighborhood of", chosen["meg_id"], key="inspect"
+    )
+    protein_row = get_proteins().set_index("meg_id").loc[inspect_id]
+
+    st.markdown(f"**{inspect_id}** — {protein_row['aa_len']} aa")
+    st.write(
+        {level: protein_row[level] for level in ONTOLOGY_LEVELS}
+        | {"requires_snp": bool(protein_row["requires_snp"])}
+    )
+    with st.expander("Sequence"):
+        st.code(protein_row["aa_seq"], language=None)
+
+    index_map: pd.DataFrame = get_index_map(model_size)
+    row_idx: int = int(index_map.index[index_map["meg_id"] == inspect_id][0])
+
+    # ask for k+1 and drop the self-hit, which always scores 1.0
+    scores, indices = search(
+        get_index(model_size), get_embeddings(model_size)[row_idx], k=top_k + 1
+    )
+    neighbors: pd.DataFrame = annotate_hits(scores, indices, model_size)
+    neighbors = neighbors[neighbors["meg_id"] != inspect_id].head(top_k)
+
+    st.caption(f"Nearest neighbors of {inspect_id} (self-hit removed)")
+    st.dataframe(neighbors, width="stretch", hide_index=True)
+
+# ---------------------------------------------------------------------------
+# Alignment tool
+# ---------------------------------------------------------------------------
+
+
+result = st.session_state.get("result")
+if result is not None:
+    hits = result["hits"]
+    target_id = st.selectbox("Align query against", hits["meg_id"])
+
+    proteins = get_proteins()
+    target = proteins.loc[proteins["meg_id"] == target_id, "aa_seq"].values[0]
+
+    aln, score, identity = get_alignment(result["protein"], target)
+    st.code(str(aln), language=None)
+
+    left, middle = st.columns(2)
+    left.metric("Identity", f"{identity:.2f}%")
+    middle.metric("BLOSUM62 score", f"{score:.0f}")
+
+    if hits.loc[hits["meg_id"] == target_id, "requires_snp"].any():
+        st.warning(
+            "This gene requires SNP confirmation - high identity is not evidence of resistance."
+        )
